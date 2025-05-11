@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Kalenderansicht</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/main.min.css">
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    #calendar { max-width: 1000px; margin: 2em auto; padding: 0 1em; }
+    #upload { margin: 1em auto; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div id="upload">
+    <input type="file" id="icsFile" accept=".ics" />
+    <p>Wähle eine .ics-Datei von deinem Gerät</p>
+  </div>
+
+  <div id="calendar"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
+  <script>
+    const calendarEl = document.getElementById('calendar');
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      locale: 'de',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek'
+      },
+      eventClick: function(info) {
+        const e = info.event;
+        const details = [
+          "Titel: " + (e.title || "(kein Titel)"),
+          "Start: " + e.start.toLocaleString(),
+          e.end ? "Ende: " + e.end.toLocaleString() : "",
+          e.extendedProps.description ? "Beschreibung: " + e.extendedProps.description : "",
+          e.extendedProps.location ? "Ort: " + e.extendedProps.location : ""
+        ].filter(x => x).join("\n");
+
+        alert(details);
+      },
+      events: []
+    });
+    calendar.render();
+
+    function parseICS(text) {
+      try {
+        const jcalData = ICAL.parse(text);
+        const comp = new ICAL.Component(jcalData);
+        const vevents = comp.getAllSubcomponents("vevent");
+
+        const events = vevents.map(ve => {
+          const e = new ICAL.Event(ve);
+          return {
+            title: e.summary || "(Ohne Titel)",
+            start: e.startDate.toJSDate(),
+            end: e.endDate.toJSDate(),
+            description: e.description,
+            location: e.location
+          };
+        });
+        return events;
+      } catch (err) {
+        console.error("Fehler beim Parsen der ICS-Daten:", err);
+        return [];
+      }
+    }
+
+    function loadFromStorage() {
+      const savedICS = localStorage.getItem("savedICS");
+      if (savedICS) {
+        const events = parseICS(savedICS);
+        calendar.removeAllEvents();
+        calendar.addEventSource(events);
+      }
+    }
+
+    document.getElementById('icsFile').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const icsText = event.target.result;
+        localStorage.setItem("savedICS", icsText); // Im Browser speichern
+        const events = parseICS(icsText);
+        calendar.removeAllEvents();
+        calendar.addEventSource(events);
+      };
+      reader.readAsText(file);
+    });
+
+    loadFromStorage();
+  </script>
+
+</body>
+</html>
